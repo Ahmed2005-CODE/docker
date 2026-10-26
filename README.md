@@ -14,6 +14,34 @@
 
 ## التشغيل
 
+### التشغيل باستخدام Docker
+
+يتطلب Docker مع Docker Compose. من مجلد المشروع شغّل:
+
+لشرح إعدادات Docker سطرًا بسطر وبأسلوب مبسط، راجع [شرح Docker في المشروع](DOCKER_EXPLAINED_AR.md).
+
+```bash
+docker compose up --build
+```
+
+ثم افتح [http://localhost:8080](http://localhost:8080). يتكوّن التشغيل من حاوية Nginx للواجهة، وحاوية Express للباك، وحاوية MongoDB. تُحفظ بيانات قاعدة البيانات في volume باسم `mongo-data`.
+
+لإيقاف الحاويات مع الاحتفاظ بالبيانات:
+
+```bash
+docker compose down
+```
+
+لحذف البيانات المحفوظة أيضًا:
+
+```bash
+docker compose down --volumes
+```
+
+يمكن تغيير منفذ الواجهة بإنشاء ملف `.env` في جذر المشروع يحتوي مثلًا على `FRONTEND_PORT=8081`.
+
+### التشغيل المحلي
+
 1. انسخ `backend/.env.example` إلى `backend/.env`، ثم اضبط قيمة `MONGO_URI` على رابط قاعدة بياناتك. ملف البيئة الافتراضي يستخدم MongoDB المحلي.
 2. انتقل إلى مجلد الباك وثبّت الحزم:
 

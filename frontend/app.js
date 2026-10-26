@@ -4,9 +4,9 @@ const habitsList = document.querySelector("#habits-list");
 const habitCount = document.querySelector("#habit-count");
 const statusMessage = document.querySelector("#status-message");
 
-// الواجهة تعمل مباشرة على 3000 أو تتصل بباك محلي عند تشغيلها عبر Live Server.
+// استخدم نفس المصدر داخل Docker، والباك المحلي عند تشغيل الواجهة منفصلة أثناء التطوير.
 const API_BASE =
-  window.location.protocol === "http:" && window.location.port === "3000"
+  window.location.protocol === "http:" && ["3000", "8080"].includes(window.location.port)
     ? ""
     : `http://${window.location.hostname || "localhost"}:3000`;
 const arabicNumber = new Intl.NumberFormat("ar");
