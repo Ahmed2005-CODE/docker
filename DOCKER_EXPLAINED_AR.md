@@ -13,6 +13,8 @@ Docker يضع كل جزء في **حاوية** خاصة به. الحاوية مث
 ```text
 المشروع/
 ├── compose.yaml              # يصف الحاويات الثلاث وكيف تعمل معًا
+├── compose.dev.yaml          # إعداد التطوير مع ربط ملفات المشروع
+├── .env.example              # مثال لمتغيرات Compose غير السرية
 ├── DOCKER_EXPLAINED_AR.md    # هذا الشرح
 ├── frontend/
 │   ├── Dockerfile            # طريقة تجهيز حاوية الواجهة
@@ -53,20 +55,21 @@ services:
 
 ```yaml
     ports:
-      - "${FRONTEND_PORT:-8080}:80"
+      - "${FRONTEND_PORT:-8080}:8080"
 ```
 
-هذا يفتح بابًا من جهازك إلى الحاوية. الرقم على اليسار هو منفذ جهازك، والرقم `80` على اليمين هو منفذ Nginx داخل الحاوية. لذلك تفتح الموقع على `http://localhost:8080`.
+هذا يفتح بابًا من جهازك إلى الحاوية. الرقم على اليسار هو منفذ جهازك، والرقم `8080` على اليمين هو منفذ Nginx غير المميز الصلاحيات داخل الحاوية. لذلك تفتح الموقع على `http://localhost:8080`.
 
 `FRONTEND_PORT` اختياري. إذا لم تضعه، يستخدم Docker الرقم `8080`. لتغييره، أنشئ ملف `.env` في جذر المشروع واكتب مثلًا `FRONTEND_PORT=8081`، ثم افتح `http://localhost:8081`.
 
 ```yaml
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     restart: unless-stopped
 ```
 
-- `depends_on` يجعل Compose يبدأ الخادم قبل الواجهة.
+- `depends_on` يجعل Compose ينتظر إلى أن ينجح فحص صحة الخادم قبل تشغيل الواجهة.
 - `restart: unless-stopped` يعيد تشغيل الحاوية إذا توقفت بسبب مشكلة، إلا إذا أوقفتها أنت.
 
 ### حاوية الخادم
@@ -82,10 +85,10 @@ services:
 ```yaml
     environment:
       PORT: 3000
-      MONGO_URI: mongodb://database:27017/habit-tracker
+      MONGO_URI: ${MONGO_URI:-mongodb://database:27017/habit-tracker}
 ```
 
-هذه إعدادات تصل إلى الخادم:
+هذه إعدادات تصل إلى الخادم. يمكن وضع `MONGO_URI` في ملف `.env` بجذر المشروع لتغييره محليًا؛ القيمة بعد `:-` هي الافتراضية عندما لا تحدد قيمة.
 
 - `PORT` هو المنفذ الذي يستقبل عليه الخادم الطلبات داخل شبكة Docker.
 - `MONGO_URI` هو عنوان قاعدة البيانات. اسم `database` هو اسم خدمة MongoDB في Compose؛ Docker يعرف كيف يجدها من داخل الشبكة. `27017` هو منفذ MongoDB، و`habit-tracker` اسم قاعدة البيانات.
@@ -150,64 +153,59 @@ volumes:
 
 هنا نطلب من Docker إنشاء مكان التخزين الدائم المسمى `mongo-data`.
 
-## 2. ملف `backend/Dockerfile`: تجهيز الخادم
+## 2. ملف `backend/Dockerfile`: تجهيز الخادم للإنتاج والتطوير
 
 ```dockerfile
-FROM node:22-alpine
+FROM node:22-alpine AS development
 ```
 
-ابدأ من صورة جاهزة فيها Node.js إصدار 22 ونظام Alpine صغير الحجم. كأننا نختار صندوقًا أساسيًا مجهزًا بـ Node.js.
-
-```dockerfile
-ENV NODE_ENV=production
-```
-
-نخبر التطبيق أنه يعمل في وضع الإنتاج، وهو الوضع المناسب للتشغيل العادي.
+ابدأ مرحلة التطوير من صورة جاهزة فيها Node.js إصدار 22 ونظام Alpine صغير الحجم. المرحلة اسمها `development` كي يختارها إعداد Compose الخاص بالتطوير.
 
 ```dockerfile
 WORKDIR /app
-```
-
-اجعل `/app` هو المجلد الذي سنضع فيه ملفات الخادم داخل الحاوية.
-
-```dockerfile
 COPY package*.json ./
-RUN npm ci --omit=dev
-```
-
-- انسخ ملفات تعريف حزم Node.js إلى الحاوية.
-- ثبّت الحزم المطلوبة للتشغيل. `npm ci` يثبت الإصدارات المسجلة في ملف القفل بدقة، و`--omit=dev` يتجاهل حزم التطوير.
-
-```dockerfile
+RUN npm ci
 COPY . .
+USER node
+EXPOSE 3000
+CMD ["npm", "run", "dev"]
 ```
 
-انسخ بقية ملفات الخادم إلى مجلد `/app` داخل الحاوية.
+يثبّت `npm ci` الحزم حسب `package-lock.json`. ثم يشغّل `npm run dev` الذي يستخدم `node --watch` لإعادة تشغيل الخادم عند حفظ تعديل على ملفاته. يعمل التطبيق بمستخدم `node` بدل المستخدم الإداري.
 
 ```dockerfile
+FROM node:22-alpine AS production
+ENV NODE_ENV=production
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --omit=dev && npm cache clean --force
+COPY --chown=node:node . .
+USER node
 EXPOSE 3000
 CMD ["npm", "start"]
 ```
 
-- `EXPOSE 3000` يوضح أن الخادم يستمع على المنفذ `3000` داخل الحاوية.
-- `CMD` هو الأمر الذي يشغّل الخادم عند بدء الحاوية.
+هذه مرحلة الإنتاج. تثبّت حزم التشغيل فقط من ملف القفل، وتنسخ الملفات بملكية المستخدم `node`، ثم تشغّل `npm start`. يستخدم Compose هذه المرحلة افتراضيًا.
 
 ## 3. ملف `backend/.dockerignore`: أشياء لا نضعها في الصندوق
 
 ```text
 node_modules
-.env
+.env*
 npm-debug.log*
+.git
+coverage
 ```
 
 - `node_modules`: لا ننسخ الحزم المثبتة على جهازك؛ Docker يثبتها داخل الصورة.
-- `.env`: لا ننسخ إعداداتك المحلية أو أسرارك إلى الصورة. Compose يمرر إعدادات التشغيل بنفسه.
+- `.env*`: لا ننسخ إعداداتك المحلية أو أسرارك إلى الصورة. Compose يقرأ ملف `.env` منفصلًا لتمرير قيم التشغيل.
 - `npm-debug.log*`: ملفات أخطاء مؤقتة لا يحتاجها التطبيق.
+- `.git` و`coverage`: ملفات Git والتغطية ليست مطلوبة لتشغيل الخادم.
 
 ## 4. ملف `frontend/Dockerfile`: تجهيز الواجهة
 
 ```dockerfile
-FROM nginx:1.27-alpine
+FROM nginxinc/nginx-unprivileged:1.27-alpine
 ```
 
 ابدأ بصورة جاهزة فيها Nginx. Nginx هنا مثل موظف استقبال يرسل ملفات الموقع إلى المتصفح.
@@ -225,22 +223,22 @@ COPY . /usr/share/nginx/html
 انسخ ملفات الواجهة، مثل HTML وCSS وJavaScript، إلى المجلد الذي يقدّم منه Nginx صفحات الموقع.
 
 ```dockerfile
-EXPOSE 80
+EXPOSE 8080
 ```
 
-وضح أن Nginx يستقبل الطلبات على المنفذ `80` داخل الحاوية.
+استخدم صورة Nginx تعمل بمستخدم غير مميز، وتوضح أن Nginx يستقبل الطلبات على المنفذ `8080` داخل الحاوية.
 
 ## 5. ملف `frontend/nginx.conf`: موظف الاستقبال
 
 ```nginx
 server {
-    listen 80;
+    listen 8080;
     server_name _;
     root /usr/share/nginx/html;
     index index.html;
 ```
 
-ابدأ إعداد موقع ويب يستمع على المنفذ `80`، ويقدّم ملفات الواجهة من `/usr/share/nginx/html`. عندما يطلب المتصفح الصفحة الرئيسية، استخدم `index.html`.
+ابدأ إعداد موقع ويب يستمع على المنفذ `8080`، ويقدّم ملفات الواجهة من `/usr/share/nginx/html`. عندما يطلب المتصفح الصفحة الرئيسية، استخدم `index.html`.
 
 ```nginx
     location /habits {
@@ -301,6 +299,14 @@ docker compose up --build
 - `--build` يعيد بناء صور الواجهة والخادم من ملفات Dockerfile قبل التشغيل.
 
 بعد ظهور أن الخدمات بدأت، افتح [http://localhost:8080](http://localhost:8080).
+
+لتشغيل وضع التطوير مع إعادة تشغيل الباك إند عند تعديل ملفاته ومزامنة ملفات الواجهة، استخدم:
+
+```bash
+docker compose -f compose.yaml -f compose.dev.yaml up --build
+```
+
+Compose يدمج ملفي الإعداد. ملفات الواجهة ثابتة ولا تستخدم أداة بناء أو HMR، لذلك احفظ التغيير وحدّث الصفحة في المتصفح.
 
 ## إيقاف المشروع وحفظ البيانات
 

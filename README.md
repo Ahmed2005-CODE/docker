@@ -16,29 +16,66 @@
 
 ### التشغيل باستخدام Docker
 
-يتطلب Docker مع Docker Compose. من مجلد المشروع شغّل:
+يتطلب Docker Desktop أو Docker Engine مع Docker Compose. يتكوّن التشغيل من ثلاث خدمات:
 
-لشرح إعدادات Docker سطرًا بسطر وبأسلوب مبسط، راجع [شرح Docker في المشروع](DOCKER_EXPLAINED_AR.md).
+- **frontend:** ملفات HTML/CSS/JavaScript ثابتة يقدمها Nginx غير مميز الصلاحيات على المنفذ `8080` داخل الحاوية.
+- **backend:** خادم Express على Node.js، يستقبل الطلبات على المنفذ `3000` داخل شبكة Docker.
+- **database:** MongoDB، وتُحفظ بياناتها في volume دائم. لا يُنشر منفذ قاعدة البيانات على جهازك.
+
+تمرّر الواجهة طلبات `/habits` وفحص `/health` إلى الباك إند عبر شبكة Docker. ينتظر Compose جاهزية MongoDB قبل تشغيل الباك إند، ثم ينتظر جاهزية الباك إند قبل تشغيل الواجهة.
+
+لشرح إعدادات Docker سطرًا بسطر، راجع [شرح Docker في المشروع](DOCKER_EXPLAINED_AR.md).
+
+#### تشغيل الإنتاج محليًا
 
 ```bash
 docker compose up --build
 ```
 
-ثم افتح [http://localhost:8080](http://localhost:8080). يتكوّن التشغيل من حاوية Nginx للواجهة، وحاوية Express للباك، وحاوية MongoDB. تُحفظ بيانات قاعدة البيانات في volume باسم `mongo-data`.
+ثم افتح [http://localhost:8080](http://localhost:8080). صورة الباك إند الإنتاجية تثبّت حزم التشغيل من `backend/package-lock.json`، ولا تنسخ ملفات `.env` أو `node_modules` إلى الصورة، وتشغّل التطبيق بمستخدم `node` غير المميز.
 
-لإيقاف الحاويات مع الاحتفاظ بالبيانات:
+#### تطوير مع مزامنة الملفات وإعادة تشغيل الباك إند
+
+```bash
+docker compose -f compose.yaml -f compose.dev.yaml up --build
+```
+
+التعديلات على ملفات الباك إند تعيد تشغيله تلقائيًا عبر `node --watch`. ملفات الواجهة مربوطة للقراءة إلى حاوية Nginx؛ احفظ الملف ثم حدّث المتصفح لرؤية التغييرات. لا يستخدم المشروع bundler أو framework للواجهة يحتاج إلى HMR.
+
+#### متغيرات البيئة والأسرار
+
+لا تُضمّن ملفات البيئة في صور Docker. ملف `.dockerignore` الخاص بكل خدمة يستبعدها من سياق البناء، و`.gitignore` يستبعد ملف `.env` المحلي من Git. انسخ `.env.example` إلى `.env` لتغيير منفذ الواجهة أو عنوان MongoDB في Compose. لا تضع أسرارًا حقيقية في `.env.example` أو في ملفات Dockerfile.
+
+#### الإيقاف وإعادة البناء والسجلات
+
+إيقاف الحاويات مع الاحتفاظ ببيانات MongoDB:
 
 ```bash
 docker compose down
 ```
 
-لحذف البيانات المحفوظة أيضًا:
+حذف بيانات MongoDB أيضًا:
 
 ```bash
 docker compose down --volumes
 ```
 
-يمكن تغيير منفذ الواجهة بإنشاء ملف `.env` في جذر المشروع يحتوي مثلًا على `FRONTEND_PORT=8081`.
+إعادة بناء الصور دون استخدام ذاكرة البناء ثم تشغيلها:
+
+```bash
+docker compose build --no-cache
+docker compose up -d
+```
+
+عرض الحالة والسجلات:
+
+```bash
+docker compose ps
+docker compose logs -f
+docker compose logs -f backend
+```
+
+أوقف متابعة السجلات بـ `Ctrl+C`؛ هذا لا يوقف الحاويات. غيّر منفذ الواجهة عبر `FRONTEND_PORT` في ملف `.env` بجذر المشروع، مثل `FRONTEND_PORT=8081`.
 
 ### التشغيل المحلي
 

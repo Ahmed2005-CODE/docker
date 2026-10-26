@@ -1,0 +1,19 @@
+services:
+  frontend:
+    volumes:
+      - ./frontend:/usr/share/nginx/html:ro
+
+  backend:
+    build:
+      context: ./backend
+      target: development
+    environment:
+      NODE_ENV: development
+      MONGO_URI: mongodb://database:27017/habit-tracker
+    volumes:
+      - ./backend:/app
+      - backend-node-modules:/app/node_modules
+      - ./frontend:/frontend:ro
+
+volumes:
+  backend-node-modules:
