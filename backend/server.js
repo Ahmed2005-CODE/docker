@@ -22,7 +22,7 @@ app.use((req, res, next) => {
   if (isLocalFrontend) {
     res.set("Access-Control-Allow-Origin", origin);
     res.set("Vary", "Origin");
-    res.set("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
+    res.set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS");
     res.set("Access-Control-Allow-Headers", "Content-Type");
   }
 
@@ -34,6 +34,13 @@ app.use((req, res, next) => {
 });
 
 app.use(express.json());
+app.get("/health", (req, res) => {
+  const databaseConnected = mongoose.connection.readyState === 1;
+  res.status(databaseConnected ? 200 : 503).json({
+    status: databaseConnected ? "ok" : "waiting_for_database",
+    database: databaseConnected ? "connected" : "disconnected",
+  });
+});
 app.use("/habits", habitRoutes);
 app.use("/habits", (req, res) => {
   res.status(404).json({ error: "مسار API غير موجود" });

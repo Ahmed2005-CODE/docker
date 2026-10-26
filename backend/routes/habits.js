@@ -51,6 +51,36 @@ router.post("/", async (req, res, next) => {
   }
 });
 
+// تعديل اسم عادة موجودة.
+router.patch("/:id", async (req, res, next) => {
+  try {
+    if (!isValidHabitId(req.params.id)) {
+      return res.status(400).json({ error: "معرّف العادة غير صالح" });
+    }
+
+    const name = typeof req.body.name === "string" ? req.body.name.trim() : "";
+    if (!name) {
+      return res.status(400).json({ error: "اكتب اسم العادة أولًا" });
+    }
+    if (name.length > 80) {
+      return res.status(400).json({ error: "اسم العادة يجب ألا يتجاوز 80 حرفًا" });
+    }
+
+    const habit = await Habit.findByIdAndUpdate(
+      req.params.id,
+      { $set: { name } },
+      { new: true, runValidators: true },
+    ).lean();
+    if (!habit) {
+      return res.status(404).json({ error: "العادة غير موجودة" });
+    }
+
+    return res.json({ ...habit, streak: calculateStreak(habit.checkins) });
+  } catch (error) {
+    return next(error);
+  }
+});
+
 // عرض العادات مع السلسلة المحسوبة على الخادم.
 router.get("/", async (req, res, next) => {
   try {
@@ -88,6 +118,32 @@ router.post("/:id/check", async (req, res, next) => {
     }
 
     return res.json({ ...habit.toObject(), streak: calculateStreak(habit.checkins) });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+// التراجع عن تسجيل إنجاز اليوم.
+router.delete("/:id/check", async (req, res, next) => {
+  try {
+    if (!isValidHabitId(req.params.id)) {
+      return res.status(400).json({ error: "معرّف العادة غير صالح" });
+    }
+
+    const habit = await Habit.findOneAndUpdate(
+      { _id: req.params.id, checkins: getToday() },
+      { $pull: { checkins: getToday() } },
+      { new: true, runValidators: true },
+    ).lean();
+    if (!habit) {
+      const exists = await Habit.exists({ _id: req.params.id });
+      if (!exists) {
+        return res.status(404).json({ error: "العادة غير موجودة" });
+      }
+      return res.status(409).json({ error: "لا يوجد إنجاز مسجل لهذه العادة اليوم" });
+    }
+
+    return res.json({ ...habit, streak: calculateStreak(habit.checkins) });
   } catch (error) {
     return next(error);
   }

@@ -3,8 +3,9 @@ const nameInput = document.querySelector("#habit-name");
 const habitsList = document.querySelector("#habits-list");
 const habitCount = document.querySelector("#habit-count");
 const statusMessage = document.querySelector("#status-message");
+const todayProgress = document.querySelector("#today-progress");
+const weekProgress = document.querySelector("#week-progress");
 
-// استخدم نفس المصدر داخل Docker، والباك المحلي عند تشغيل الواجهة منفصلة أثناء التطوير.
 const API_BASE =
   window.location.protocol === "http:" && ["3000", "8080"].includes(window.location.port)
     ? ""
@@ -97,7 +98,16 @@ function createHabitCard(habit, days, today) {
   deleteButton.textContent = "حذف";
   deleteButton.setAttribute("aria-label", `حذف عادة ${habit.name}`);
   deleteButton.addEventListener("click", () => deleteHabit(habit._id));
-  top.append(name, deleteButton);
+  const editButton = document.createElement("button");
+  editButton.className = "edit-button";
+  editButton.type = "button";
+  editButton.textContent = "تعديل";
+  editButton.setAttribute("aria-label", `تعديل عادة ${habit.name}`);
+  editButton.addEventListener("click", () => editHabit(habit));
+  const controls = document.createElement("div");
+  controls.className = "habit-controls";
+  controls.append(editButton, deleteButton);
+  top.append(name, controls);
 
   const actions = document.createElement("div");
   actions.className = "habit-actions";
@@ -107,7 +117,15 @@ function createHabitCard(habit, days, today) {
   checkButton.type = "button";
   checkButton.disabled = habit.checkins.includes(today);
   checkButton.textContent = checkButton.disabled ? "تم تسجيلها اليوم ✓" : "تم النهارده ✓";
-  checkButton.addEventListener("click", () => checkHabit(habit._id));
+  if (checkButton.disabled) {
+    checkButton.title = "اضغط للتراجع عن إنجاز اليوم";
+    checkButton.setAttribute("aria-label", "التراجع عن إنجاز اليوم");
+    checkButton.addEventListener("click", () => undoCheck(habit._id));
+    checkButton.disabled = false;
+    checkButton.classList.add("is-complete");
+  } else {
+    checkButton.addEventListener("click", () => checkHabit(habit._id));
+  }
 
   const streak = document.createElement("span");
   streak.className = "streak";
@@ -128,6 +146,14 @@ function createHabitCard(habit, days, today) {
 function renderHabits(habits) {
   const days = getLastSevenDays();
   const today = days[days.length - 1].key;
+  const completedToday = habits.filter((habit) => habit.checkins.includes(today)).length;
+  const weeklyCheckins = habits.reduce(
+    (total, habit) => total + habit.checkins.filter((date) => days.some((day) => day.key === date)).length,
+    0,
+  );
+
+  todayProgress.textContent = `${arabicNumber.format(completedToday)} / ${arabicNumber.format(habits.length)}`;
+  weekProgress.textContent = arabicNumber.format(weeklyCheckins);
   habitsList.replaceChildren();
   habitCount.textContent = `${arabicNumber.format(habits.length)} ${habits.length === 1 ? "عادة" : "عادات"}`;
 
@@ -161,6 +187,32 @@ async function checkHabit(id) {
   try {
     await request(`/habits/${encodeURIComponent(id)}/check`, { method: "POST" });
     showMessage("عظيم! تم تسجيل إنجاز اليوم 🎉");
+    await loadHabits();
+  } catch (error) {
+    showMessage(error.message, true);
+  }
+}
+
+async function undoCheck(id) {
+  try {
+    await request(`/habits/${encodeURIComponent(id)}/check`, { method: "DELETE" });
+    showMessage("تم التراجع عن إنجاز اليوم.");
+    await loadHabits();
+  } catch (error) {
+    showMessage(error.message, true);
+  }
+}
+
+async function editHabit(habit) {
+  const name = window.prompt("اكتب الاسم الجديد للعادة:", habit.name);
+  if (name === null || !name.trim()) return;
+
+  try {
+    await request(`/habits/${encodeURIComponent(habit._id)}`, {
+      method: "PATCH",
+      body: JSON.stringify({ name: name.trim() }),
+    });
+    showMessage("تم تعديل اسم العادة.");
     await loadHabits();
   } catch (error) {
     showMessage(error.message, true);

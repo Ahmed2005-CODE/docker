@@ -35,6 +35,11 @@ button {
   cursor: pointer;
 }
 
+button:focus-visible {
+  outline: 3px solid #88bd98;
+  outline-offset: 3px;
+}
+
 .page {
   width: min(100% - 40px, 760px);
   margin: 0 auto;
@@ -82,6 +87,45 @@ h1 {
   padding: 22px;
 }
 
+.progress-panel {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 13px;
+  margin-top: 16px;
+}
+
+.progress-card {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 16px 19px;
+  border: 1px solid #e1ebe2;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #fff, #f1f7f1);
+}
+
+.progress-icon {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 13px;
+  background: #e5f1e7;
+  font-size: 1.25rem;
+}
+
+.progress-card p {
+  margin: 0 0 3px;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.progress-card strong {
+  color: var(--green-dark);
+  font-size: 1.2rem;
+}
+
 .add-panel h2,
 .section-heading h2 {
   margin-bottom: 14px;
@@ -127,6 +171,11 @@ h1 {
 .check-button:hover:not(:disabled) {
   background: var(--green-dark);
   transform: translateY(-1px);
+}
+
+.primary-button:active,
+.check-button:active {
+  transform: translateY(0);
 }
 
 .habits-section {
@@ -179,17 +228,38 @@ h1 {
   font-weight: 700;
 }
 
-.delete-button {
+.habit-controls {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 4px;
+}
+
+.delete-button,
+.edit-button {
   padding: 5px 8px;
   border: 0;
   border-radius: 8px;
   background: transparent;
-  color: #9b625e;
   font-size: 0.85rem;
+}
+
+.edit-button {
+  color: var(--green-dark);
+}
+
+.edit-button:hover {
+  background: #edf5ef;
+  color: #164d33;
+}
+
+.delete-button {
+  color: #9b625e;
 }
 
 .delete-button:hover {
   background: #fff1ef;
+  color: #783d39;
 }
 
 .habit-actions {
@@ -205,6 +275,18 @@ h1 {
   background: #e8f1e9;
   color: var(--green-dark);
   cursor: default;
+}
+
+.check-button.is-complete {
+  background: #e8f1e9;
+  color: var(--green-dark);
+  transition: background 150ms ease, color 150ms ease;
+}
+
+.check-button.is-complete:hover:not(:disabled) {
+  background: #dcebdd;
+  color: #194f35;
+  transform: none;
 }
 
 .streak {
@@ -296,6 +378,11 @@ footer {
   .add-panel,
   .habit-card {
     padding: 17px;
+  }
+
+  .progress-panel {
+    grid-template-columns: 1fr;
+    gap: 9px;
   }
 
   #habit-form {

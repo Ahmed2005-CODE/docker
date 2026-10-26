@@ -7,7 +7,6 @@ const habitSchema = new mongoose.Schema({
     trim: true,
     maxlength: [80, "اسم العادة يجب ألا يتجاوز 80 حرفًا"],
   },
-  // نخزّن الأيام كنصوص YYYY-MM-DD لتفادي اختلافات التوقيت.
   checkins: {
     type: [String],
     default: [],
